@@ -5,4 +5,4 @@ project(raytracer)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(raytracer temp/writeppm.cpp)
+add_executable(raytracer src/main.cpp)
