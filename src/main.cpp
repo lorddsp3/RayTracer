@@ -1,8 +1,12 @@
-#include "color.h"
-#include "vec3.h"
 #include <fstream>
 #include <string>
 #include <iostream>
+#include <format>
+
+#include "color.h"
+#include "vec3.h"
+#include "../asset/extra/libs/progressbar.hpp"
+
 
 int main() {
     // lets take that as input lol
@@ -16,8 +20,9 @@ int main() {
     // Render
     img_out << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
+    progressbar bar(image_height);
     for (int j = 0; j < image_height; j++) {
-        std::cout << "\rScanlines remaining: " << (image_height - j) << ' ' << std::endl;
+        bar.update(std::format("\rScanlines remaining: {}/{}", j+1, image_height));
         for (int i = 0; i < image_width; i++) {
             auto pixel_color = color(double(i)/(image_width-1), double(j)/(image_height-1), 0);
             write_color(img_out, pixel_color);
