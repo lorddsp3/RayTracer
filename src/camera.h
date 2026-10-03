@@ -2,12 +2,13 @@
 #define CAMERA_H
 
 #include <fstream>
-#include <string>
-#include <format>
 
 #include "hittable.h"
+#include "material.h"
 #include "color.h"
 #include "../asset/extra/libs/progressbar.hpp"
+#include "../asset/extra/libs/img_count.hpp"
+
 
 #include <limits>
 
@@ -22,31 +23,37 @@ class camera {
         image_size_mode size_mode = image_size_mode::default_size;
         double aspect_ratio = 1.0;  // Ratio of image width over height
         int    image_width  = 400, image_height=225;  // Rendered image width,height in pixel count
+        std::string file_path = "asset/output/";
+        std::string img_open_cmd = "";
+        int    samples_per_pixel = 10;   // Count of random samples for each pixel
+        int    max_depth         = 10;   // Maximum number of ray bounces into scene
 
         void render(const hittable& world) {
             initialize();    
             // file
-            const std::string out_filepath = "asset/output/" + std::to_string(image_width) + "x" + std::to_string(image_height) + ".ppm";
+            const std::string out_filepath = generate_image_path(file_path, image_height, image_width);
             std::ofstream img_out(out_filepath);
             progressbar bar(image_height);
 
             img_out << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
             for (int j = 0; j < image_height; j++) {
-                bar.update(std::format("\rScanlines : {}/{}", j+1, image_height));
+                bar.update("\rScanlines : ", j+1);
                 // std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
                 for (int i = 0; i < image_width; i++) {
-                    auto pixel_center = pixel00_loc + (i * pixel_delta_u) + (j * pixel_delta_v);
-                    auto ray_direction = pixel_center - center;
-                    ray r(center, ray_direction);
-
-                    color pixel_color = ray_color(r, world);
-                    write_color(img_out, pixel_color);
+                    color pixel_color(0,0,0);
+                    for (int sample = 0; sample < samples_per_pixel; sample++) {
+                        ray r = get_ray(i, j);
+                        pixel_color += ray_color(r, max_depth, world);
+                    }
+                    write_color(img_out, pixel_samples_scale * pixel_color);
                 }
             }
-            std::cout << "DONE" << std::endl;
-            std::cout << "Opening Image via gnome image viewer\nfilepath: "<< out_filepath << std::endl;
-            system(("gio open " + out_filepath).c_str());
+            std::cout << "DONE\nfilepath: " << out_filepath;
+            if (!img_open_cmd.empty()) {
+                std::cout << "\nOpening Image via image viewer: "+img_open_cmd << std::endl;
+                system((img_open_cmd + out_filepath).c_str());
+            }
         }
 
   private:
@@ -54,6 +61,7 @@ class camera {
     point3 pixel00_loc;    // Location of pixel 0, 0
     vec3   pixel_delta_u;  // Offset to pixel to the right
     vec3   pixel_delta_v;  // Offset to pixel below
+    double pixel_samples_scale; // Color scale factor for a sum of pixel samples
 
 
     void initialize() {
@@ -69,7 +77,7 @@ class camera {
         } // else default size 400:225
         
         
-
+        pixel_samples_scale = 1.0 / samples_per_pixel;
         center = point3(0, 0, 0);
 
         // Determine viewport dimensions.
@@ -90,12 +98,41 @@ class camera {
             center - vec3(0, 0, focal_length) - viewport_u/2 - viewport_v/2;
         pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
     }
+    
+    ray get_ray(int i, int j) const {
+        // Construct a camera ray originating from the origin and directed at randomly sampled
+        // point around the pixel location i, j.
 
-    color ray_color(const ray& r, const hittable& world) const {
+        auto offset = sample_square();
+        auto pixel_sample = pixel00_loc
+                          + ((i + offset.x()) * pixel_delta_u)
+                          + ((j + offset.y()) * pixel_delta_v);
+
+        auto ray_origin = center;
+        auto ray_direction = pixel_sample - ray_origin;
+
+        return ray(ray_origin, ray_direction);
+    }
+
+    vec3 sample_square() const {
+        // Returns the vector to a random point in the [-.5,-.5]-[+.5,+.5] unit square.
+        return vec3(random_double() - 0.5, random_double() - 0.5, 0);
+    }
+
+    
+    color ray_color(const ray& r, int depth, const hittable& world) const {
+        // If we've exceeded the ray bounce limit, no more light is gathered.
+        if (depth <= 0)
+            return color(0,0,0);
+
         hit_record rec;
 
-        if (world.hit(r, interval(0, std::numeric_limits<double>::infinity()), rec)) {
-            return 0.5 * (rec.normal + color(1,1,1));
+        if (world.hit(r, interval(0.001, infinity), rec)) {
+            ray scattered;
+            color attenuation;
+            if (rec.mat->scatter(r, rec, attenuation, scattered))
+                return attenuation * ray_color(scattered, depth-1, world);
+            return color(0,0,0);
         }
 
         vec3 unit_direction = unit_vector(r.direction());

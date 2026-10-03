@@ -66,6 +66,22 @@ class vec3 {
     double length() const {
         return std::sqrt(length_squared());
     }
+
+    static vec3 random() {
+        return vec3(random_double(), random_double(), random_double());
+    }
+
+    static vec3 random(double min, double max) {
+        return vec3(random_double(min,max), random_double(min,max), random_double(min,max));
+    }
+
+    bool near_zero() const {
+        // Return true if the vector is close to zero in all dimensions.
+        auto s = 1e-8;
+        return (std::fabs(e[0]) < s) && (std::fabs(e[1]) < s) && (std::fabs(e[2]) < s);
+    }
+
+
 };
 
 // point3 is just an alias for vec3, but useful for geometric clarity in the code.
@@ -145,6 +161,28 @@ inline vec3 unit_vector(const vec3& v) {
 // So: v / 5 = (0.6, 0.8, 0)
 // Its length is now: 1
 // This is called normalization.
+
+inline vec3 random_unit_vector() {
+    while (true) {
+        auto p = vec3::random(-1,1);
+        auto lensq = p.length_squared();
+        if (1e-160 < lensq && lensq <= 1)
+            return p / sqrt(lensq);
+    }
+}
+
+inline vec3 random_on_hemisphere(const vec3& normal) {
+    vec3 on_unit_sphere = random_unit_vector();
+    if (dot(on_unit_sphere, normal) > 0.0) // In the same hemisphere as the normal
+        return on_unit_sphere;
+    else
+        return -on_unit_sphere;
+}
+
+inline vec3 reflect(const vec3& v, const vec3& n) {
+    return v - 2*dot(v,n)*n;
+}
+
 
 
 #endif

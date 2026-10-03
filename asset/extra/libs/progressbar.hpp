@@ -18,7 +18,7 @@ public:
 
     inline void reset();
     inline void set_niter(int iter);
-    inline void update(const std::string& status = "");
+    inline void update(const std::string& status = "", const int done = -1);
 
 private:
     int progress = 0;
@@ -38,7 +38,7 @@ inline void progressbar::set_niter(int iter) {
     n_cycles = iter;
 }
 
-inline void progressbar::update(const std::string& status) {
+inline void progressbar::update(const std::string& status, const int done) {
     if (n_cycles == 0) throw std::runtime_error("progressbar: number of cycles not set");
 
     int perc = (n_cycles == 1) ? 100 : (progress * 100) / (n_cycles - 1);
@@ -59,7 +59,7 @@ inline void progressbar::update(const std::string& status) {
         // Print status on the line below
         if (!status.empty()) {
             // Move down, clear line, print status text
-            std::cerr << "\n\033[K" << status;
+            std::cerr << "\n\033[K" << status + std::to_string(done) + "/" + std::to_string(n_cycles);
             // \033[1A moves cursor UP 1 line to return to the bar line
             std::cerr << "\033[1A\r";
         }
